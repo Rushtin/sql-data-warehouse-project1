@@ -1,7 +1,22 @@
+/*
+Stored Procedure: Load Bronze Layer (Bronze -> Silver)
+Script Purpose: 
+  This stored procedure performs Extract, Transform, Load (ETL) to tkae over 'silver' schema
+  It performs the following action:
+    - Truncates Silver tables
+    - Inserts transformed and cleaned data from Bronze to Silver tables
+
+No parameters 
+
+Usage example: 
+  EXEC silver.load_silver;
+*/
+
 CREATE OR ALTER PROCEDURE silver.load_silver AS
   BEGIN
     DECLARE @start_time DATETIME, @end_time DATETIME, @batch_start_time DATETIME, @batch_end_time DATETIME;
     BEGIN TRY
+      SET @batch_start_time = GETDATE();
       PRINT '================================';
       PRINT 'Loading Silver Layer';
       PRINT '================================';
@@ -9,12 +24,10 @@ CREATE OR ALTER PROCEDURE silver.load_silver AS
       PRINT 'Loading CRM Tables';
       PRINT '================================';
       
-      -- Loading silver.crm_cust_info
       SET @start_time = GETDATE();
       PRINT '>> Truncating Table: silver.crm_cust_info';
       TRUNCATE TABLE silver.crm_cust_info;
       PRINT '>> Inserting Data Into: silver.crm_cust_info';
-      
       INSERT INTO silver.crm_cust_info (
       	cst_id,
       	cst_key,
@@ -47,7 +60,6 @@ CREATE OR ALTER PROCEDURE silver.load_silver AS
         ROW_NUMBER() OVER (PARTITION BY cst_id ORDER BY cst_create_date DESC) as flag_last
         FROM bronze.crm_cust_info 
         WHERE cst_id IS NOT NULL)t WHERE flag_last = 1
-      
       SET @end_time = GETDATE();
       PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) as NVARCHAR ) + ' seconds';
       
@@ -84,8 +96,7 @@ CREATE OR ALTER PROCEDURE silver.load_silver AS
       FROM bronze.crm_prd_info
       SET @end_time = GETDATE();
       PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) as NVARCHAR ) + ' seconds';
-       
-      -- Loading silver.sales_details
+
       SET @start_time = GETDATE();
       PRINT '>> Truncating Table: silver.crm_sales_details';
       TRUNCATE TABLE silver.crm_sales_details;
@@ -129,7 +140,11 @@ CREATE OR ALTER PROCEDURE silver.load_silver AS
           ELSE sls_price
         END AS sls_price
       FROM bronze.crm_sales_details
+      SET @end_time = GETDATE();
+      PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) as NVARCHAR ) + ' seconds';
 
+      PRINT '================================';
+      PRINT 'Loading ERP Tables';
       SET @start_time = GETDATE();
       PRINT '>> Truncating Table: silver.erp_cust_az12';
       TRUNCATE TABLE silver.erp_cust_az12;
@@ -150,7 +165,6 @@ CREATE OR ALTER PROCEDURE silver.load_silver AS
           ELSE 'n/a'
         END AS gen
         FROM bronze.erp_cust_az12
-      
       SET @end_time = GETDATE();
       PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) as NVARCHAR ) + ' seconds';
       
@@ -169,7 +183,6 @@ CREATE OR ALTER PROCEDURE silver.load_silver AS
           ELSE TRIM(cntry)
         END AS cntry
       FROM bronze.erp_loc_a101
-      
       SET @end_time = GETDATE();
       PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) as NVARCHAR ) + ' seconds';
       
@@ -185,14 +198,14 @@ CREATE OR ALTER PROCEDURE silver.load_silver AS
         subcat,
         maintenance
       FROM bronze.erp_px_cat_g1v2
-      
       SET @end_time = GETDATE();
       PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) as NVARCHAR ) + ' seconds';
 
-    PRINT '=========================================='
-		PRINT 'Loading Silver Layer is Completed';
-    PRINT '   - Total Load Duration: ' + CAST(DATEDIFF(SECOND, @batch_start_time, @batch_end_time) AS NVARCHAR) + ' seconds';
-		PRINT '=========================================='
+      SET @batch_end_time = GETDATE();
+      PRINT '==========================================';
+      PRINT 'Loading Silver Layer is Completed';
+      PRINT ' -Total Load Duration: ' + CAST(DATEDIFF(SECOND, @batch_start_time, @batch_end_time) AS NVARCHAR) + ' seconds';
+      PRINT '==========================================';
   	END TRY
 	BEGIN CATCH
 		PRINT '==================ERROR OCCURED=====================';
